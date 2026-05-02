@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Night Runner - Fixed Camera</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #01010a; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        #ui-container { position: absolute; top: 20px; left: 20px; color: #ffd700; font-size: 24px; font-weight: bold; z-index: 10; text-shadow: 2px 2px 8px #000; }
+        #speed-tag, #magnet-status { color: #00ffff; font-size: 16px; margin-top: 5px; }
+        #magnet-status { color: #ff00ff; display: none; font-weight: bold; }
+        #gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(5, 5, 25, 0.98); color: #ff3333; padding: 40px; border: 3px solid #ff3333; text-align: center; display: none; z-index: 20; border-radius: 20px; width: 75%; }
+        button { background: #ff3333; color: white; border: none; padding: 14px 45px; font-size: 22px; cursor: pointer; margin-top: 25px; border-radius: 12px; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <div id="score-text">Coins: 0</div>
+        <div id="speed-tag">Speed: 1.0x</div>
+        <div id="magnet-status">MAGNET ACTIVE: 10s</div>
+    </div>
+
+    <div id="gameOver">
+        <h1>CRASHED!</h1>
+        <p id="finalScore" style="color: #fff; font-size: 20px;"></p>
+        <button onclick="resetGame()">PLAY AGAIN</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        let scene, camera, renderer, player, floorGroup;
+        let obstacles = [], coins = [], fireflies = [], magnets = [];
+        let isGameOver = false, score = 0, currentSpeed = 0.35;
+        let targetX = 0, touchStartX = 0;
+        let magnetActive = false, magnetTimer = 0;
+        let limbSwing = 0;
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020010);
+            scene.fog = new THREE.Fog(0x020010, 15, 90);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // তারা
+            const starPoints = [];
+            for(let i=0; i<3000; i++) { starPoints.push((Math.random()-0.5)*600, Math.random()*300, (Math.random()-1)*500); }
+            const starGeo = new THREE.BufferGeometry();
+            starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPoints, 3));
+            scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xffffff, size: 0.25})));
+
+            // রাস্তা
+            floorGroup = new THREE.Group();
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(18, 400), new THREE.MeshStandardMaterial({ color: 0x151515 }));
+            floor.rotation.x = -Math.PI / 2;
+            floorGroup.add(floor);
+            scene.add(floorGroup);
+
+            createCharacter();
+            createFireflies();
+
+            scene.add(new THREE.AmbientLight(0x606060));
+            const light = new THREE.DirectionalLight(0xffffff, 1.5);
+            light.position.set(5, 20, 10);
+            scene.add(light);
+
+            // ক্যামেরার নতুন সেফ পজিশন
+            camera.position.set(0, 8, 15);
+
+            spawnItems();
+
+            window.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
+            window.addEventListener('touchend', e => {
+                let diff = touchStartX - e.changedTouches[0].clientX;
+                if (Math.abs(diff) > 15) {
+                    targetX += (diff > 0 ? -5.5 : 5.5);
+                    targetX = Math.max(-5.5, Math.min(5.5, targetX));
+                }
+            });
+
+            animate();
+        }
+
+        function createCharacter() {
+            player = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+            
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.6), mat);
+            body.position.y = 1.6;
+            player.add(body);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0x00ffff}));
+            head.position.y = 2.6;
+            player.add(head);
+
+            player.leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1, 0.3), mat);
+            player.leftArm.position.set(-0.7, 1.6, 0);
+            player.add(player.leftArm);
+
+            player.rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1, 0.3), mat);
+            player.rightArm.position.set(0.7, 1.6, 0);
+            player.add(player.rightArm);
+
+            player.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1, 0.4), mat);
+            player.leftLeg.position.set(-0.3, 0.5, 0);
+            player.add(player.leftLeg);
+
+            player.rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1, 0.4), mat);
+            player.rightLeg.position.set(0.3, 0.5, 0);
+            player.add(player.rightLeg);
+
+            scene.add(player);
+        }
+
+        function createFireflies() {
+            fireflies.forEach(f => scene.remove(f));
+            fireflies = [];
+            for(let i=0; i<40; i++) {
+                const fly = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.15, 6, 6),
+                    new THREE.MeshStandardMaterial({color: 0x33ff33, emissive: 0x33ff33, emissiveIntensity: 1})
+                );
+                resetFly(fly);
+                fireflies.push(fly);
+                scene.add(fly);
+            }
+        }
+
+        function resetFly(fly) {
+            const side = Math.random() < 0.5 ? -12 : 12;
+            fly.position.set(side + (Math.random()-0.5)*6, 2 + Math.random()*4, player ? player.position.z - 150 : -200);
+            fly.flicker = Math.random() * 10;
+        }
+
+        function spawnItems() {
+            obstacles.forEach(o => scene.remove(o));
+            coins.forEach(c => scene.remove(c));
+            magnets.forEach(m => scene.remove(m));
+            obstacles = []; coins = []; magnets = [];
+            const lanes = [-5.5, 0, 5.5];
+            for(let i = 0; i < 20; i++) {
+                const obs = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2, 2), new THREE.MeshStandardMaterial({color: 0xff4444}));
+                obs.position.set(lanes[Math.floor(Math.random()*3)], 1, -i * 50 - 80);
+                obs.passed = false;
+                scene.add(obs); obstacles.push(obs);
+
+                const coin = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.12, 8, 20), new THREE.MeshStandardMaterial({color: 0xffd700, emissive: 0xaa8800}));
+                coin.position.set(lanes[Math.floor(Math.random()*3)], 1.5, -i * 50 - 40);
+                scene.add(coin); coins.push(coin);
+
+                if (i % 10 === 0 && i !== 0) {
+                    const mag = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 0.6), new THREE.MeshStandardMaterial({color: 0xff00ff, emissive: 0xff00ff}));
+                    mag.position.set(lanes[Math.floor(Math.random()*3)], 1.5, -i * 60 - 150);
+                    scene.add(mag); magnets.push(mag);
+                }
+            }
+        }
+
+        function animate() {
+            if (isGameOver) return;
+            requestAnimationFrame(animate);
+
+            player.position.z -= currentSpeed;
+            player.position.x += (targetX - player.position.x) * 0.2;
+
+            limbSwing += currentSpeed * 0.8;
+            player.leftArm.rotation.x = Math.sin(limbSwing) * 0.8;
+            player.rightArm.rotation.x = -Math.sin(limbSwing) * 0.8;
+            player.leftLeg.rotation.x = -Math.sin(limbSwing) * 0.8;
+            player.rightLeg.rotation.x = Math.sin(limbSwing) * 0.8;
+
+            if (player.position.z < floorGroup.position.z - 100) floorGroup.position.z -= 200;
+
+            if (magnetActive) {
+                magnetTimer -= 0.016;
+                document.getElementById('magnet-status').innerText = `MAGNET ACTIVE: ${Math.ceil(magnetTimer)}s`;
+                if (magnetTimer <= 0) {
+                    magnetActive = false;
+                    document.getElementById('magnet-status').style.display = 'none';
+                }
+            }
+
+            fireflies.forEach(fly => {
+                fly.flicker += 0.05;
+                fly.material.emissiveIntensity = (Math.sin(fly.flicker) + 1) / 2;
+                if(fly.position.z > player.position.z + 15) resetFly(fly);
+            });
+
+            obstacles.forEach(obs => {
+                if (!obs.passed && obs.position.z > player.position.z) {
+                    obs.passed = true;
+                    currentSpeed += 0.015;
+                    document.getElementById('speed-tag').innerText = `Speed: ${(currentSpeed/0.35).toFixed(1)}x`;
+                }
+                if (player.position.distanceTo(obs.position) < 2.2) endGame();
+                if (obs.position.z > player.position.z + 20) {
+                    obs.position.z -= 1000;
+                    obs.position.x = [-5.5, 0, 5.5][Math.floor(Math.random()*3)];
+                    obs.passed = false;
+                }
+            });
+
+            coins.forEach(coin => {
+                coin.rotation.y += 0.05;
+                if (magnetActive && player.position.distanceTo(coin.position) < 20) {
+                    coin.position.lerp(new THREE.Vector3(player.position.x, 1.8, player.position.z), 0.18);
+                }
+                if (player.position.distanceTo(coin.position) < 2) {
+                    score += 1; 
+                    document.getElementById('score-text').innerText = `Coins: ${score}`;
+                    coin.position.z -= 1000; 
+                }
+                if (coin.position.z > player.position.z + 20) {
+                    coin.position.z -= 1000;
+                    coin.position.x = [-5.5, 0, 5.5][Math.floor(Math.random()*3)];
+                }
+            });
+
+            magnets.forEach(m => {
+                m.rotation.y += 0.05;
+                if (player.position.distanceTo(m.position) < 2.5) {
+                    magnetActive = true; magnetTimer = 10;
+                    document.getElementById('magnet-status').style.display = 'block';
+                    m.position.z -= 1200;
+                }
+                if (m.position.z > player.position.z + 20) m.position.z -= 1200;
+            });
+
+            // ক্যামেরা লজিক (মাথা থেকে একটু ওপরে এবং পেছনে)
+            const targetCamPos = new THREE.Vector3(player.position.x * 0.4, 8, player.position.z + 16);
+            camera.position.lerp(targetCamPos, 0.1);
+            camera.lookAt(player.position.x, 2, player.position.z - 5);
+
+            renderer.render(scene, camera);
+        }
+
+        function endGame() {
+            isGameOver = true;
+            document.getElementById('finalScore').innerText = "Coins Collected: " + score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        function resetGame() {
+            isGameOver = false; score = 0; currentSpeed = 0.35; targetX = 0;
+            magnetActive = false; player.position.set(0, 0, 0); floorGroup.position.z = 0;
+            document.getElementById('score-text').innerText = "Coins: 0";
+            document.getElementById('magnet-status').style.display = 'none';
+            spawnItems(); createFireflies();
+            document.getElementById('gameOver').style.display = 'none';
+            animate();
+        }
+
+        init();
+    </script>
+</body>
+</html>
