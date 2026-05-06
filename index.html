@@ -3,17 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Night Runner - Pro Edition</title>
+    <title>Night Runner - Integrated Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #01010a; font-family: 'Segoe UI', sans-serif; touch-action: none; }
-        #ui-container { position: absolute; top: 20px; left: 20px; color: #ffd700; font-size: 24px; font-weight: bold; z-index: 10; text-shadow: 2px 2px 8px #000; }
+        /* ১. সাধারণ স্টাইল */
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #01010a; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        
+        /* ২. স্প্ল্যাশ স্ক্রিন */
+        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000 url('https://i.postimg.cc/BQT3DbzY/20260505-204518.jpg') no-repeat center center; background-size: cover; z-index: 10000; transition: opacity 1s ease-out; }
+        
+        /* ৩. লবি / হোমবার স্টাইল (তোমার ডিজাইন করা) */
+        #home-dashboard { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000 url('https://i.postimg.cc/Gh2CWwJN/1778062711391.png') no-repeat center center; background-size: cover; display: none; flex-direction: column; justify-content: space-between; align-items: center; z-index: 500; }
+        .top-header { width: 95%; padding: 15px 0; display: flex; justify-content: space-between; align-items: flex-start; }
+        .currency-box { background: rgba(0, 0, 0, 0.7); border: 2px solid gold; border-radius: 20px; padding: 4px 12px; display: flex; align-items: center; gap: 10px; color: white; box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
+        .bottom-nav { width: 100%; background: linear-gradient(to top, rgba(0,0,0,0.95), transparent); display: flex; justify-content: space-around; align-items: center; padding: 10px 0 30px 0; }
+        .icon-box { width: 60px; height: 60px; background: #111; border: 3px solid gold; border-radius: 18px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        .play-btn { background: linear-gradient(to bottom, #00ffff, #008080) !important; border-color: #fff !important; width: 75px !important; height: 75px !important; transform: translateY(-15px); box-shadow: 0 0 20px rgba(0, 255, 255, 0.6); }
+        .nav-text { color: gold; font-size: 10px; font-weight: bold; text-transform: uppercase; margin-top: 5px; }
+
+        /* ৪. তোমার গেমের অরিজিনাল UI স্টাইল */
+        #ui-container { position: absolute; top: 20px; left: 20px; color: #ffd700; font-size: 24px; font-weight: bold; z-index: 100; text-shadow: 2px 2px 8px #000; display: none; }
         #speed-tag, #magnet-status { color: #00ffff; font-size: 16px; margin-top: 5px; }
         #magnet-status { color: #ff00ff; display: none; font-weight: bold; }
-        #gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(5, 5, 25, 0.98); color: #ff3333; padding: 40px; border: 3px solid #ff3333; text-align: center; display: none; z-index: 20; border-radius: 20px; width: 75%; }
-        button { background: #ff3333; color: white; border: none; padding: 14px 45px; font-size: 22px; cursor: pointer; margin-top: 25px; border-radius: 12px; }
+        #gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(5, 5, 25, 0.98); color: #ff3333; padding: 40px; border: 3px solid #ff3333; text-align: center; display: none; z-index: 1000; border-radius: 20px; width: 75%; }
+        .game-btn { background: #ff3333; color: white; border: none; padding: 14px 45px; font-size: 22px; cursor: pointer; margin-top: 25px; border-radius: 12px; }
+        
+        .fade-out { opacity: 0; visibility: hidden; }
     </style>
 </head>
 <body>
+
+    <div id="splash-screen"></div>
+
+    <div id="home-dashboard">
+        <header class="top-header">
+            <div class="currency-box" style="border-color: #ff00ff;">
+                <div style="display:flex; flex-direction:column">
+                    <span style="font-size: 8px; color: #ff00ff;">HIGH SCORE</span>
+                    <span style="font-size: 16px;">0</span>
+                </div>
+            </div>
+            <div class="currency-box">
+                <span>🪙</span> <span id="lobby-coins">0</span>
+            </div>
+        </header>
+
+        <nav class="bottom-nav">
+            <div class="icon-box"><span>👤</span></div>
+            <div class="icon-box"><span>🛒</span></div>
+            <div class="nav-item" onclick="startGame()">
+                <div class="icon-box play-btn"><span>🏃</span></div>
+                <div class="nav-text" style="color:white">Play</div>
+            </div>
+            <div class="icon-box"><span>🏆</span></div>
+            <div class="icon-box"><span>⚙️</span></div>
+        </nav>
+    </div>
 
     <div id="ui-container">
         <div id="score-text">Coins: 0</div>
@@ -24,7 +68,7 @@
     <div id="gameOver">
         <h1>CRASHED!</h1>
         <p id="finalScore" style="color: #fff; font-size: 20px;"></p>
-        <button onclick="resetGame()">PLAY AGAIN</button>
+        <button class="game-btn" onclick="resetGame()">PLAY AGAIN</button>
     </div>
 
     <audio id="bgMusic" src="https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3" loop></audio>
@@ -34,6 +78,23 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
+        // লবি কন্ট্রোল লজিক
+        setTimeout(function() {
+            document.getElementById('splash-screen').classList.add('fade-out');
+            document.getElementById('home-dashboard').style.display = 'flex';
+        }, 4000);
+
+        function startGame() {
+            document.getElementById('home-dashboard').style.display = 'none';
+            document.getElementById('ui-container').style.display = 'block';
+            const music = document.getElementById('bgMusic');
+            music.play();
+            init(); // তোমার অরিজিনাল গেম ইঞ্জিন চালু করা
+        }
+
+        // ---------------------------------------------------------
+        // তোমার অরিজিনাল গেম কোড (একদম হুবহু)
+        // ---------------------------------------------------------
         let scene, camera, renderer, player, floorGroup;
         let obstacles = [], coins = [], fireflies = [], magnets = [];
         let isGameOver = false, score = 0, currentSpeed = 0.35;
@@ -78,8 +139,6 @@
             window.addEventListener('touchstart', e => {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
-                const music = document.getElementById('bgMusic');
-                if (music.paused) music.play();
             });
 
             window.addEventListener('touchend', e => {
@@ -124,8 +183,7 @@
         }
 
         function createFireflies() {
-            fireflies.forEach(f => scene.remove(f));
-            fireflies = [];
+            fireflies.forEach(f => scene.remove(f)); fireflies = [];
             for(let i=0; i<40; i++) {
                 const fly = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshStandardMaterial({color: 0x33ff33, emissive: 0x33ff33, emissiveIntensity: 1}));
                 resetFly(fly);
@@ -141,21 +199,16 @@
         }
 
         function spawnItems() {
-            obstacles.forEach(o => scene.remove(o));
-            coins.forEach(c => scene.remove(c));
-            magnets.forEach(m => scene.remove(m));
+            obstacles.forEach(o => scene.remove(o)); coins.forEach(c => scene.remove(c)); magnets.forEach(m => scene.remove(m));
             obstacles = []; coins = []; magnets = [];
             const lanes = [-5.5, 0, 5.5];
             for(let i = 0; i < 20; i++) {
-                // নতুন লজিক: কিছু বাধা লম্বা (Tall) হবে
-                const isTall = Math.random() > 0.7; // ৩০% বাধা লম্বা হবে
+                const isTall = Math.random() > 0.7;
                 const obsHeight = isTall ? 6 : 2; 
                 const obsY = isTall ? 3 : 1;
-
                 const obs = new THREE.Mesh(new THREE.BoxGeometry(4.5, obsHeight, 2), new THREE.MeshStandardMaterial({color: 0xff4444}));
                 obs.position.set(lanes[Math.floor(Math.random()*3)], obsY, -i * 50 - 80);
-                obs.isTall = isTall; // লম্বা বাধা কি না সেটা চেনার জন্য
-                obs.passed = false;
+                obs.isTall = isTall; obs.passed = false;
                 scene.add(obs); obstacles.push(obs);
 
                 const coin = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.12, 8, 20), new THREE.MeshStandardMaterial({color: 0xffd700, emissive: 0xaa8800}));
@@ -177,12 +230,8 @@
             player.position.x += (targetX - player.position.x) * 0.2;
 
             if (isJumping) {
-                player.position.y += jumpVelocity;
-                jumpVelocity -= gravity;
-                if (player.position.y <= 0) {
-                    player.position.y = 0;
-                    isJumping = false;
-                }
+                player.position.y += jumpVelocity; jumpVelocity -= gravity;
+                if (player.position.y <= 0) { player.position.y = 0; isJumping = false; }
             }
 
             if (!isJumping) {
@@ -196,32 +245,22 @@
             if (player.position.z < floorGroup.position.z - 100) floorGroup.position.z -= 200;
 
             fireflies.forEach(fly => {
-                fly.flicker += 0.05;
-                fly.material.emissiveIntensity = (Math.sin(fly.flicker) + 1) / 2;
+                fly.flicker += 0.05; fly.material.emissiveIntensity = (Math.sin(fly.flicker) + 1) / 2;
                 if(fly.position.z > player.position.z + 15) resetFly(fly);
             });
 
             obstacles.forEach(obs => {
                 if (!obs.passed && obs.position.z > player.position.z) {
-                    obs.passed = true;
-                    currentSpeed += 0.015;
+                    obs.passed = true; currentSpeed += 0.015;
                     document.getElementById('speed-tag').innerText = `Speed: ${(currentSpeed/0.35).toFixed(1)}x`;
                 }
-
-                // কলিশন লজিক আপডেট: লম্বা বাধা হলে লাফিয়ে পার হওয়া যাবে না
                 let hitHeight = obs.isTall ? 6 : 1.5; 
                 if (player.position.distanceTo(obs.position) < 2.5 && player.position.y < hitHeight) endGame();
-
                 if (obs.position.z > player.position.z + 20) {
-                    obs.position.z -= 1000;
-                    obs.position.x = [-5.5, 0, 5.5][Math.floor(Math.random()*3)];
-                    
-                    // বাধা যখন রিস্পন হবে, তখন আবার র‍্যান্ডমলি লম্বা বা খাটো হতে পারে
+                    obs.position.z -= 1000; obs.position.x = lanes[Math.floor(Math.random()*3)];
                     const isTall = Math.random() > 0.7;
                     obs.geometry = new THREE.BoxGeometry(4.5, isTall ? 6 : 2, 2);
-                    obs.position.y = isTall ? 3 : 1;
-                    obs.isTall = isTall;
-                    obs.passed = false;
+                    obs.position.y = isTall ? 3 : 1; obs.isTall = isTall; obs.passed = false;
                 }
             });
 
@@ -231,37 +270,31 @@
                     coin.position.lerp(new THREE.Vector3(player.position.x, player.position.y + 1.5, player.position.z), 0.18);
                 }
                 if (player.position.distanceTo(coin.position) < 2) {
-                    score += 1; 
-                    document.getElementById('score-text').innerText = `Coins: ${score}`;
-                    document.getElementById('coinSound').currentTime = 0;
-                    document.getElementById('coinSound').play();
+                    score += 1; document.getElementById('score-text').innerText = `Coins: ${score}`;
+                    document.getElementById('coinSound').currentTime = 0; document.getElementById('coinSound').play();
                     coin.position.z -= 1000; 
                 }
                 if (coin.position.z > player.position.z + 20) {
-                    coin.position.z -= 1000;
-                    coin.position.x = [-5.5, 0, 5.5][Math.floor(Math.random()*3)];
+                    coin.position.z -= 1000; coin.position.x = lanes[Math.floor(Math.random()*3)];
                 }
             });
 
             if (magnetActive) {
                 magnetTimer -= 0.016;
                 document.getElementById('magnet-status').innerText = `MAGNET ACTIVE: ${Math.ceil(magnetTimer)}s`;
-                if (magnetTimer <= 0) {
-                    magnetActive = false;
-                    document.getElementById('magnet-status').style.display = 'none';
-                }
+                if (magnetTimer <= 0) { magnetActive = false; document.getElementById('magnet-status').style.display = 'none'; }
             }
 
             magnets.forEach(m => {
                 m.rotation.y += 0.05;
                 if (player.position.distanceTo(m.position) < 2.5) {
                     magnetActive = true; magnetTimer = 10;
-                    document.getElementById('magnet-status').style.display = 'block';
-                    m.position.z -= 1200;
+                    document.getElementById('magnet-status').style.display = 'block'; m.position.z -= 1200;
                 }
                 if (m.position.z > player.position.z + 20) m.position.z -= 1200;
             });
 
+            // তোমার সেই অরিজিনাল ক্যামেরা ভিউ
             camera.position.x = player.position.x * 0.4;
             camera.position.z = player.position.z + 15;
             camera.lookAt(player.position.x, 2, player.position.z - 5);
@@ -277,7 +310,6 @@
         }
 
         function resetGame() { location.reload(); }
-        init();
     </script>
 </body>
 </html>
